@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos gerados pelo sistema (Discos do FURGfs4)
+*.fs
+
+# Arquivos temporários de teste
+dummy.txt
+restored.txt
