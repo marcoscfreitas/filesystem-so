@@ -1,17 +1,9 @@
-"""
-main.py - Ponto de entrada do sistema de arquivos FURGfs4.
-
-Fornece uma interface interativa de linha de comando (CLI) para que o usuário
-possa interagir com as funções do FURGfs4. O sistema funciona num laço infinito
-até que a opção '0' seja selecionada.
-"""
-
 import sys
 import os
 from core.furgfs import FURGfs
 
 def print_menu():
-    """Exibe o menu interativo com todas as opções suportadas."""
+    """Mostra o painel com as opções de comandos do trabalho"""
     print("\n" + "="*40)
     print("FURGfs4 - Sistema de Arquivos")
     print("="*40)
@@ -25,18 +17,19 @@ def print_menu():
     print("8. Exibir espaço livre (df)")
     print("9. Proteger/Desproteger arquivo")
     print("10. Modo debug (listar blocos)")
+    print("11. Calcular SHA256 de um arquivo")
     print("0. Sair")
     print("="*40)
 
 def main():
-    """Função principal que gerencia o loop de eventos da CLI."""
-    fs = None  # Instância do FURGfs atual
+    """Loop infinito para capturar as opções do teclado"""
+    fs = None  # começa sem nenhum disco carregado
     
     while True:
         print_menu()
         choice = input("Escolha uma opção: ")
         
-        # Opção 1: Inicializa um novo sistema de arquivos vazio.
+        # opção 1: criar do zero
         if choice == '1':
             filepath = input("Digite o nome do arquivo para o novo FS (ex: disk.fs): ")
             try:
@@ -49,7 +42,7 @@ def main():
             except ValueError:
                 print("Por favor digite um número válido.")
                 
-        # Opção 2: Carrega (monta) um sistema de arquivos existente.
+        # opção 2: dar load num que já foi criado antes
         elif choice == '2':
             filepath = input("Digite o nome do arquivo do FS: ")
             if not os.path.exists(filepath):
@@ -59,21 +52,21 @@ def main():
             if fs.sb:
                 print("Sistema de arquivos carregado com sucesso.")
             else:
-                print("Falha ao carregar o sistema de arquivos (superbloco inválido).")
+                print("Falha ao carregar o sistema de arquivos.")
                 fs = None
                 
-        # Opção 0: Encerra a aplicação.
+        # opção 0: sair
         elif choice == '0':
             print("Saindo...")
             sys.exit(0)
             
         else:
-            # Qualquer outra opção requer que o FS já esteja carregado.
+            # se for as outras opções, tem q ter carregado o fs antes
             if fs is None or not fs.sb:
                 print("Você precisa criar ou carregar um FS primeiro!")
                 continue
                 
-            # Mapeamento das rotinas do FURGfs para as opções do menu:
+            # distribuindo pro núcleo do furgfs
             if choice == '3':
                 src = input("Caminho do arquivo de origem (sistema real): ")
                 dst = input("Nome do arquivo destino (no FURGfs4): ")
@@ -99,6 +92,9 @@ def main():
             elif choice == '10':
                 filename = input("Nome do arquivo para debug: ")
                 fs.debug(filename)
+            elif choice == '11':
+                filename = input("Nome do arquivo para calcular SHA256: ")
+                fs.sha256sum(filename)
             else:
                 print("Opção inválida.")
 

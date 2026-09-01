@@ -1,12 +1,3 @@
-"""
-furgfs.py - Lógica principal do sistema de arquivos FURGfs4.
-
-Contém a classe FURGfs que encapsula todas as operações de I/O binário
-sobre o arquivo que hospeda o sistema de arquivos. Todas as leituras e
-escritas são feitas de forma seletiva (apenas os blocos necessários são
-carregados na RAM, nunca o FS inteiro).
-"""
-
 import os
 import time
 import struct
@@ -20,22 +11,18 @@ class FURGfs:
     Classe principal que gerencia o sistema de arquivos FURGfs4.
 
     O FURGfs4 reside inteiramente dentro de um arquivo binário no SO hospedeiro.
-    Sua estrutura interna é:
+    Estrutura interna:
         [Superbloco] [FAT] [Diretório Raiz] [Área de Dados]
     """
 
     def __init__(self, filepath):
         """Inicializa o gerenciador apontando para o arquivo do FS."""
         self.filepath = filepath
-        self.sb = None  # Superbloco (cabeçalho), carregado sob demanda
+        self.sb = None  # superbloco que será carregado depois
 
-        # Se o arquivo já existe, carrega o superbloco automaticamente
+        # se o arquivo já existir a gente já lê o cabeçalho
         if os.path.exists(filepath):
             self._load_superblock()
-
-    # =================================================================
-    # Métodos internos de leitura/escrita das estruturas no disco
-    # =================================================================
 
     def _load_superblock(self):
         """Lê o superbloco (primeiros bytes) do arquivo do FS."""
@@ -81,7 +68,8 @@ class FURGfs:
         """Grava a FAT atualizada de volta no disco."""
         fat_size_bytes = (self.sb['root_dir_start_block'] - self.sb['fat_start_block']) * BLOCK_SIZE
         fat_data = struct.pack(f"<{len(fat)}I", *fat)
-        # Preenche com zeros até completar os blocos da FAT
+        
+        # se faltar espaço, enche de zeros
         fat_data += b'\x00' * (fat_size_bytes - len(fat_data))
 
         with open(self.filepath, 'rb+') as f:
@@ -109,13 +97,13 @@ class FURGfs:
                 f.seek(current_block * BLOCK_SIZE)
                 block_data = f.read(BLOCK_SIZE)
 
-                # Cada bloco contém 32 entradas de diretório (4096/128)
+                # quebra o bloco em pedaços de 128 bytes
                 for i in range(0, BLOCK_SIZE, DIR_ENTRY_SIZE):
                     entry_data = block_data[i:i + DIR_ENTRY_SIZE]
                     entry = unpack_dir_entry(entry_data)
                     entries.append(entry)
 
-                # Se este bloco é o último da cadeia, para
+                # se achou o fim da cadeia de blocos, pode parar
                 if current_block == FAT_EOF or fat[current_block] == FAT_EOF:
                     break
                 current_block = fat[current_block]
@@ -136,7 +124,7 @@ class FURGfs:
             while current_block != FAT_FREE and current_block < self.sb['total_blocks']:
                 block_data = bytearray()
 
-                # Empacota até 32 entradas por bloco
+                # coloca até 32 arquivos dentro de cada bloco
                 for _ in range(BLOCK_SIZE // DIR_ENTRY_SIZE):
                     if entry_idx < total_entries:
                         e = entries[entry_idx]
@@ -147,13 +135,13 @@ class FURGfs:
                         )
                         entry_idx += 1
                     else:
-                        # Entradas não utilizadas preenchidas com zeros
+                        # se sobrar espaço, bota lixo vazio
                         block_data += pack_dir_entry("", 0, 0, 0, 0, 0, 0, 0)
 
                 f.seek(current_block * BLOCK_SIZE)
                 f.write(block_data)
 
-                # Se este bloco é o último da cadeia, para
+                # para se acabar a cadeia
                 if current_block == FAT_EOF or fat[current_block] == FAT_EOF:
                     break
                 current_block = fat[current_block]
@@ -173,10 +161,6 @@ class FURGfs:
             return None
         return free_blocks
 
-    # =================================================================
-    # Operações públicas do sistema de arquivos
-    # =================================================================
-
     def create_fs(self, size_mb):
         """
         Operação 1: Cria um novo FURGfs4 no tamanho escolhido pelo usuário.
@@ -191,58 +175,58 @@ class FURGfs:
             size_mb: tamanho do FS em megabytes.
         """
         if size_mb < MIN_FS_SIZE_MB or size_mb > MAX_FS_SIZE_MB:
-            print(f"Tamanho deve estar entre {MIN_FS_SIZE_MB} e {MAX_FS_SIZE_MB} MB.")
+            print(f"tamanho tem que ser entre {MIN_FS_SIZE_MB} e {MAX_FS_SIZE_MB} mb.")
             return
 
         size_bytes = size_mb * 1024 * 1024
         total_blocks = size_bytes // BLOCK_SIZE
 
-        # Calcula quantos blocos a FAT ocupa (4 bytes por entrada)
+        # calcula quantos blocos a fat vai precisar (4 bytes por posição)
         fat_size_bytes = total_blocks * 4
         fat_blocks = math.ceil(fat_size_bytes / BLOCK_SIZE)
 
-        # Posições das seções no disco
-        fat_start = 1                              # FAT começa logo após o superbloco
-        root_start = fat_start + fat_blocks        # Diretório raiz após a FAT
-        data_start = root_start + ROOT_DIR_BLOCKS  # Dados após o diretório raiz
-        free_blocks = total_blocks - data_start     # Blocos disponíveis para dados
+        # acerta os ponteiros do início de cada parte do disco
+        fat_start = 1
+        root_start = fat_start + fat_blocks
+        data_start = root_start + ROOT_DIR_BLOCKS
+        free_blocks = total_blocks - data_start
 
         if free_blocks <= 0:
             print("Tamanho muito pequeno para criar o FS.")
             return
 
         with open(self.filepath, 'wb') as f:
-            # ---- Escreve o Superbloco (bloco 0) ----
+            # grava o superbloco logo no comecinho
             sb_data = pack_superblock(
                 "FURGfs4\0", SUPERBLOCK_SIZE, BLOCK_SIZE,
                 total_blocks, fat_start, data_start, free_blocks, root_start
             )
             f.write(sb_data)
-            f.write(b'\x00' * (BLOCK_SIZE - SUPERBLOCK_SIZE))  # Padding do bloco 0
+            f.write(b'\x00' * (BLOCK_SIZE - SUPERBLOCK_SIZE))  # enche o resto do bloco 0
 
-            # ---- Escreve a FAT ----
+            # monta a fat na memória pra gravar tudo de uma vez
             fat = [FAT_FREE] * total_blocks
-            fat[0] = FAT_RESERVED  # Bloco 0 = Superbloco (reservado)
+            fat[0] = FAT_RESERVED  # bloco 0 é intocável (superbloco)
             for i in range(fat_start, root_start):
-                fat[i] = FAT_RESERVED  # Blocos da FAT (reservados)
+                fat[i] = FAT_RESERVED  # blocos da fat também não podem ser mexidos
 
-            # Encadeia os blocos do diretório raiz na FAT
+            # liga os blocos do diretório raiz um no outro
             for i in range(ROOT_DIR_BLOCKS - 1):
                 fat[root_start + i] = root_start + i + 1
-            fat[root_start + ROOT_DIR_BLOCKS - 1] = FAT_EOF  # Último bloco do dir raiz
+            fat[root_start + ROOT_DIR_BLOCKS - 1] = FAT_EOF  # o último ganha o marcador de fim
 
             fat_bytes = struct.pack(f"<{total_blocks}I", *fat)
             f.write(fat_bytes)
             f.write(b'\x00' * ((fat_blocks * BLOCK_SIZE) - len(fat_bytes)))
 
-            # ---- Escreve o Diretório Raiz (ROOT_DIR_BLOCKS blocos vazios) ----
+            # agora escreve os blocos vazios do diretório
             empty_entry = pack_dir_entry("", 0, 0, 0, 0, 0, 0, 0)
-            entries_per_block = BLOCK_SIZE // DIR_ENTRY_SIZE  # 32
+            entries_per_block = BLOCK_SIZE // DIR_ENTRY_SIZE
             for _ in range(ROOT_DIR_BLOCKS):
                 for _ in range(entries_per_block):
                     f.write(empty_entry)
 
-            # ---- Preenche o restante do arquivo até o tamanho desejado ----
+            # estica o arquivo até dar o tamanho final em mb
             f.seek(size_bytes - 1)
             f.write(b'\x00')
 
@@ -269,12 +253,11 @@ class FURGfs:
             print("Espaço insuficiente no FURGfs4.")
             return
 
-        # Lê FAT e diretório raiz
         fat = self._read_fat()
         self.read_fat_cached = fat
         entries = self._read_dir(self.sb['root_dir_start_block'])
 
-        # Verifica se já existe e encontra uma entrada livre
+        # primeiro ve se já não tem um arquivo com esse nome
         free_entry_idx = -1
         for i, e in enumerate(entries):
             if e['in_use'] and e['name'] == dest:
@@ -289,29 +272,30 @@ class FURGfs:
             del self.read_fat_cached
             return
 
-        # Aloca blocos livres na FAT
+        # tenta separar os blocos na fat
         blocks = self._find_free_blocks(fat, blocks_needed)
         if blocks is None:
             print("Não foi possível alocar blocos suficientes.")
             del self.read_fat_cached
             return
 
-        # Escreve os dados do arquivo nos blocos alocados e encadeia a FAT
         first_block = blocks[0]
         with open(source, 'rb') as f_src, open(self.filepath, 'rb+') as f_dst:
             for i in range(blocks_needed):
                 b = blocks[i]
-                # Encadeia: bloco atual aponta pro próximo, último aponta EOF
+                
+                # amarra a corrente na fat
                 fat[b] = blocks[i + 1] if i < blocks_needed - 1 else FAT_EOF
 
                 data = f_src.read(BLOCK_SIZE)
                 f_dst.seek(b * BLOCK_SIZE)
                 f_dst.write(data)
-                # Preenche o restante do último bloco com zeros
+                
+                # se o último pedaço for curto, enche o resto de zero
                 if len(data) < BLOCK_SIZE:
                     f_dst.write(b'\x00' * (BLOCK_SIZE - len(data)))
 
-        # Atualiza a entrada de diretório
+        # atualiza a entrada no diretório
         now = int(time.time())
         entries[free_entry_idx] = {
             'name': dest,
@@ -324,7 +308,7 @@ class FURGfs:
             'modified': now,
         }
 
-        # Persiste tudo no disco
+        # salva a fat e o diretorio no disco
         self._write_dir(self.sb['root_dir_start_block'], entries)
         self._write_fat(fat)
         self.sb['free_blocks'] -= blocks_needed
@@ -354,7 +338,7 @@ class FURGfs:
                     print(f"'{source}' é um diretório, não um arquivo.")
                     return
 
-                # Percorre a cadeia FAT escrevendo os dados no destino
+                # navega lendo a fat e gravando de volta pra fora
                 with open(dest, 'wb') as f_dst, open(self.filepath, 'rb') as f_src:
                     bytes_left = e['size_bytes']
                     current_block = e['first_block']
@@ -366,7 +350,7 @@ class FURGfs:
                         f_dst.write(data)
                         bytes_left -= to_read
 
-                        # Se chegou ao fim da cadeia, para
+                        # se der eof, para
                         if fat[current_block] == FAT_EOF:
                             break
                         current_block = fat[current_block]
@@ -387,14 +371,14 @@ class FURGfs:
         self.read_fat_cached = fat
         entries = self._read_dir(self.sb['root_dir_start_block'])
 
-        # Verifica se o novo nome já existe
+        # verifica se já existe um arquivo com o nome novo
         for e in entries:
             if e['in_use'] and e['name'] == new_name:
                 print(f"Já existe um arquivo chamado '{new_name}'.")
                 del self.read_fat_cached
                 return
 
-        # Busca o arquivo e renomeia
+        # acha e renomeia
         for e in entries:
             if e['in_use'] and e['name'] == old_name:
                 if e['is_protected']:
@@ -431,7 +415,7 @@ class FURGfs:
                     del self.read_fat_cached
                     return
 
-                # Percorre a cadeia e libera cada bloco
+                # desfaz a cadeia de blocos apagando da fat
                 current_block = e['first_block']
                 blocks_freed = 0
                 while current_block != FAT_FREE and current_block < self.sb['total_blocks']:
@@ -442,10 +426,10 @@ class FURGfs:
                         break
                     current_block = nxt
 
-                # Marca a entrada como não utilizada
+                # avisa no diretório que liberou
                 e['in_use'] = 0
 
-                # Persiste as alterações
+                # salva
                 self._write_dir(self.sb['root_dir_start_block'], entries)
                 self._write_fat(fat)
                 self.sb['free_blocks'] += blocks_freed
@@ -474,10 +458,10 @@ class FURGfs:
         count = 0
         for e in entries:
             if e['in_use']:
-                # Calcula quantos blocos o arquivo efetivamente ocupa
+                # ve quantos blocos inteiros ele gasta
                 blocks = math.ceil(e['size_bytes'] / BLOCK_SIZE) if e['size_bytes'] > 0 else 1
                 occupied = blocks * BLOCK_SIZE
-                prot = "Sim" if e['is_protected'] else "Não"
+                prot = "sim" if e['is_protected'] else "não"
                 print(f"{e['name']:<30} | {e['size_bytes']:<15} | {occupied:<17} | {prot}")
                 count += 1
 
@@ -517,7 +501,7 @@ class FURGfs:
 
         for e in entries:
             if e['in_use'] and e['name'] == filename:
-                # Toggle do bit de proteção
+                # inverte o botão de proteção
                 e['is_protected'] = 0 if e['is_protected'] else 1
                 status = "protegido" if e['is_protected'] else "desprotegido"
                 self._write_dir(self.sb['root_dir_start_block'], entries)
@@ -544,7 +528,7 @@ class FURGfs:
                 print(f"  Criado: {time.ctime(e['created'])}")
                 print(f"  Modificado: {time.ctime(e['modified'])}")
 
-                # Percorre a cadeia FAT coletando os índices dos blocos
+                # caça todos os blocos na fat pra mostrar
                 blocks = []
                 current = e['first_block']
                 while current != FAT_FREE and current < self.sb['total_blocks']:
@@ -557,3 +541,41 @@ class FURGfs:
                 return
 
         print(f"Arquivo '{filename}' não encontrado.")
+
+    def sha256sum(self, filename):
+        """
+        Operação 10 (Extra): Calcula e exibe o hash SHA-256 de um arquivo
+        diretamente do sistema de arquivos, sem extrair os dados.
+        """
+        import hashlib
+
+        fat = self._read_fat()
+        entries = self._read_dir(self.sb['root_dir_start_block'])
+
+        for e in entries:
+            if e['in_use'] and e['name'] == filename:
+                if e['type'] == TYPE_DIR:
+                    print(f"'{filename}' é um diretório.")
+                    return
+
+                h = hashlib.sha256()
+                bytes_left = e['size_bytes']
+                current_block = e['first_block']
+
+                with open(self.filepath, 'rb') as f:
+                    while bytes_left > 0 and current_block != FAT_FREE:
+                        f.seek(current_block * BLOCK_SIZE)
+                        to_read = min(bytes_left, BLOCK_SIZE)
+                        data = f.read(to_read)
+                        h.update(data)
+                        bytes_left -= to_read
+
+                        if fat[current_block] == FAT_EOF:
+                            break
+                        current_block = fat[current_block]
+
+                print(f"{h.hexdigest()}  {filename}")
+                return
+
+        print(f"Arquivo '{filename}' não encontrado.")
+

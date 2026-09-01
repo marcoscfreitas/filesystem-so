@@ -1,51 +1,36 @@
-"""
-structs.py - Estruturas de dados binárias do FURGfs4.
-
-Usa o módulo 'struct' do Python para serializar/desserializar o Superbloco
-e as Entradas de Diretório em formato binário de tamanho fixo, garantindo
-alinhamento perfeito com o tamanho do bloco de 4096 bytes.
-"""
-
 import struct
 from .constants import MAX_FILENAME_LEN
 
-# =====================================================================
-# SUPERBLOCO (Cabeçalho do sistema de arquivos)
-# =====================================================================
-# Formato little-endian (<):
-#   8 bytes : Assinatura ("FURGfs4\0") - identifica o FS
-#   4 bytes : Tamanho do cabeçalho em bytes (header_size)
-#   4 bytes : Tamanho do bloco em bytes (block_size)
-#   4 bytes : Total de blocos no FS (total_blocks)
-#   4 bytes : Bloco de início da FAT (fat_start_block)
-#   4 bytes : Bloco de início dos dados (data_start_block)
-#   4 bytes : Quantidade de blocos livres (free_blocks)
-#   4 bytes : Bloco de início do diretório raiz (root_dir_start_block)
-# Total: 8 + 7×4 = 36 bytes
+# estrutura do superbloco (o cabeçalho do sistema):
+#   8 bytes pro nome da assinatura
+#   4 bytes pro tamanho do cabeçalho
+#   4 bytes pro tamanho do bloco
+#   4 bytes pro total de blocos
+#   4 bytes pro bloco onde começa a fat
+#   4 bytes pro bloco onde começam os dados
+#   4 bytes pros blocos livres
+#   4 bytes pro bloco do diretório raiz
+# total dá 36 bytes. 
 SUPERBLOCK_FMT = "<8sIIIIIII"
 SUPERBLOCK_SIZE = struct.calcsize(SUPERBLOCK_FMT)
 
 
-# =====================================================================
-# ENTRADA DE DIRETÓRIO
-# =====================================================================
-# Formato little-endian (<):
-#   100 bytes : Nome do arquivo/diretório (MAX_FILENAME_LEN)
-#     4 bytes : Primeiro bloco na FAT (first_block)
-#     4 bytes : Tamanho real do arquivo em bytes (size_bytes)
-#     1 byte  : Em uso (in_use: 0=não, 1=sim)
-#     1 byte  : Protegido contra escrita/remoção (is_protected: 0=não, 1=sim)
-#     1 byte  : Tipo da entrada (type: 0=arquivo, 1=diretório)
-#     4 bytes : Timestamp de criação (created)
-#     4 bytes : Timestamp de modificação (modified)
-#     9 bytes : Padding (preenchimento para alinhar a 128 bytes)
-# Total: 100 + 4 + 4 + 1 + 1 + 1 + 4 + 4 + 9 = 128 bytes
-# Com 4096 / 128 = 32 entradas por bloco.
+# estrutura de uma entrada de diretório (arquivos salvos):
+#   100 bytes pro nome do arquivo
+#     4 bytes pro bloco inicial dele na fat
+#     4 bytes pro tamanho real do arquivo
+#     1 byte  pra dizer se a entrada tá em uso (0 não, 1 sim)
+#     1 byte  pra proteção (0 não, 1 sim)
+#     1 byte  pro tipo (0 arquivo, 1 diretório)
+#     4 bytes de data de criação
+#     4 bytes de data de modificação
+#     9 bytes de padding pra bater exatos 128 bytes
+# com isso cabem 32 arquivos por bloco de 4kb.
 DIR_ENTRY_FMT = f"<{MAX_FILENAME_LEN}sIIBBBII9s"
 DIR_ENTRY_SIZE = struct.calcsize(DIR_ENTRY_FMT)
 
-# Verifica que o tamanho da entrada está correto em tempo de importação
-assert DIR_ENTRY_SIZE == 128, f"DIR_ENTRY_SIZE é {DIR_ENTRY_SIZE}, esperado 128"
+# checa se o tamanho bateu os 128
+assert DIR_ENTRY_SIZE == 128, f"tamanho da entrada deu {DIR_ENTRY_SIZE}, devia ser 128"
 
 
 def pack_superblock(signature, header_size, block_size, total_blocks,
@@ -83,7 +68,7 @@ def pack_dir_entry(name, first_block, size_bytes, in_use,
                    is_protected, entry_type, created, modified):
     """Serializa uma entrada de diretório para bytes (128 bytes fixos)."""
     name_bytes = name.encode('utf-8')
-    # Trunca se o nome for maior que o permitido
+    # corta o nome se for maior que o permitido
     if len(name_bytes) > MAX_FILENAME_LEN:
         name_bytes = name_bytes[:MAX_FILENAME_LEN]
 
@@ -97,7 +82,7 @@ def pack_dir_entry(name, first_block, size_bytes, in_use,
         entry_type,
         created,
         modified,
-        b'\x00' * 9  # Padding de alinhamento
+        b'\x00' * 9  # enche de zeros pra bater o tamanho
     )
 
 
