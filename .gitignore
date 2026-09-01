@@ -11,7 +11,3 @@ __pycache__/
 
 # Arquivos gerados pelo sistema (Discos do FURGfs4)
 *.fs
-
-# Arquivos temporários de teste
-dummy.txt
-restored.txt

@@ -1,8 +1,17 @@
+"""
+main.py - Ponto de entrada do sistema de arquivos FURGfs4.
+
+Fornece uma interface interativa de linha de comando (CLI) para que o usuário
+possa interagir com as funções do FURGfs4. O sistema funciona num laço infinito
+até que a opção '0' seja selecionada.
+"""
+
 import sys
 import os
 from core.furgfs import FURGfs
 
 def print_menu():
+    """Exibe o menu interativo com todas as opções suportadas."""
     print("\n" + "="*40)
     print("FURGfs4 - Sistema de Arquivos")
     print("="*40)
@@ -20,12 +29,14 @@ def print_menu():
     print("="*40)
 
 def main():
-    fs = None
+    """Função principal que gerencia o loop de eventos da CLI."""
+    fs = None  # Instância do FURGfs atual
     
     while True:
         print_menu()
         choice = input("Escolha uma opção: ")
         
+        # Opção 1: Inicializa um novo sistema de arquivos vazio.
         if choice == '1':
             filepath = input("Digite o nome do arquivo para o novo FS (ex: disk.fs): ")
             try:
@@ -38,6 +49,7 @@ def main():
             except ValueError:
                 print("Por favor digite um número válido.")
                 
+        # Opção 2: Carrega (monta) um sistema de arquivos existente.
         elif choice == '2':
             filepath = input("Digite o nome do arquivo do FS: ")
             if not os.path.exists(filepath):
@@ -47,18 +59,21 @@ def main():
             if fs.sb:
                 print("Sistema de arquivos carregado com sucesso.")
             else:
-                print("Falha ao carregar o sistema de arquivos.")
+                print("Falha ao carregar o sistema de arquivos (superbloco inválido).")
                 fs = None
                 
+        # Opção 0: Encerra a aplicação.
         elif choice == '0':
             print("Saindo...")
             sys.exit(0)
             
         else:
+            # Qualquer outra opção requer que o FS já esteja carregado.
             if fs is None or not fs.sb:
                 print("Você precisa criar ou carregar um FS primeiro!")
                 continue
                 
+            # Mapeamento das rotinas do FURGfs para as opções do menu:
             if choice == '3':
                 src = input("Caminho do arquivo de origem (sistema real): ")
                 dst = input("Nome do arquivo destino (no FURGfs4): ")
