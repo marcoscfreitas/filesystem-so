@@ -13,7 +13,6 @@ O repositório está organizado da seguinte forma:
 * `core/constants.py`: Define todas as configurações-base do FS, como o **tamanho fixo de bloco de 4KB (4096 bytes)**.
 * `core/structs.py`: Utiliza o módulo `struct` para montar a matemática exata de bytes das entradas. Ex: Cada entrada de diretório tem *exatos* 128 bytes, permitindo 32 arquivos por bloco de diretório.
 * `core/furgfs.py`: O "cérebro" do sistema de arquivos. Contém as implementações dos métodos de leitura/escrita da FAT, Superbloco e manuseio dos dados brutos dentro dos limites físicos do arquivo host.
-* `tests/test_script.py`: Um script em lote usado durante o desenvolvimento que prova a funcionalidade 100% de leitura/escrita, *copy in/out*, formatação e travas.
 
 ## Operações Suportadas
 
@@ -29,6 +28,7 @@ Através da execução de `main.py`, as seguintes tarefas podem ser executadas (
 8. **Estatísticas (df)**: Lê o superbloco para reportar quantos megabytes/bytes estão em uso/livres, e o total de blocos da FAT ocupados.
 9. **Proteção (protect)**: Chaveia (toggle) um *bit de proteção* interno, rejeitando que o arquivo seja removido ou renomeado se ativado.
 10. **Modo Debug**: Analisa a correnteza (chain) de blocos de um determinado arquivo na FAT e imprime no console para fins de debug acadêmico de alocação de espaços.
+11. **Calcular SHA256**: Calcula o hash SHA-256 de um arquivo diretamente do sistema de arquivos, sem extrair os dados.
 
 ## Como Executar
 
