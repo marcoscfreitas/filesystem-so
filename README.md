@@ -29,6 +29,8 @@ Através da execução de `main.py`, as seguintes tarefas podem ser executadas (
 9. **Proteção (protect)**: Chaveia (toggle) um *bit de proteção* interno, rejeitando que o arquivo seja removido ou renomeado se ativado.
 10. **Modo Debug**: Analisa a correnteza (chain) de blocos de um determinado arquivo na FAT e imprime no console para fins de debug acadêmico de alocação de espaços.
 11. **Calcular SHA256**: Calcula o hash SHA-256 de um arquivo diretamente do sistema de arquivos, sem extrair os dados.
+12. **Buscar (find)**: Procura por arquivos cujo nome contenha um termo, em todo o FURGfs4.
+13. **Comparar (diff)**: Compara um arquivo armazenado no FURGfs4 com um arquivo externo, bloco a bloco, e informa se são iguais ou diferentes.
 
 ## Como Executar
 

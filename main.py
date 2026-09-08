@@ -18,6 +18,8 @@ def print_menu():
     print("9. Proteger/Desproteger arquivo")
     print("10. Modo debug (listar blocos)")
     print("11. Calcular SHA256 de um arquivo")
+    print("12. Buscar arquivo em todo o FURGfs4")
+    print("13. Comparar arquivo interno com externo (diff)")
     print("0. Sair")
     print("="*40)
 
@@ -95,6 +97,13 @@ def main():
             elif choice == '11':
                 filename = input("Nome do arquivo para calcular SHA256: ")
                 fs.sha256sum(filename)
+            elif choice == '12':
+                term = input("Termo a buscar no nome dos arquivos: ")
+                fs.search(term)
+            elif choice == '13':
+                internal = input("Nome do arquivo dentro do FURGfs4: ")
+                external = input("Caminho do arquivo externo para comparar: ")
+                fs.diff(internal, external)
             else:
                 print("Opção inválida.")
 

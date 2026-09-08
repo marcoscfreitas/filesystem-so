@@ -5,16 +5,16 @@ BLOCK_SIZE = 4096
 
 # limites de tamanho do fs em mb
 MIN_FS_SIZE_MB = 1
-MAX_FS_SIZE_MB = 2048  # 2gb de limite pra não travar tudo
+MAX_FS_SIZE_MB = 2048  # 2gb de limite
 
 # quantidade de blocos reservados para o diretório raiz
-# 4 blocos * 32 entradas por bloco = 128 entradas (passa de 100 como o prof pediu)
+# 4 blocos * 32 entradas por bloco = 128 entradas
 ROOT_DIR_BLOCKS = 4
 
-# valores especiais que a gente usa na fat
-FAT_FREE     = 0x00000000  # bloco tá livre pra uso
+# valores especiais usados na fat
+FAT_FREE     = 0x00000000  # bloco livre pra uso
 FAT_EOF      = 0xFFFFFFFF  # último bloco do arquivo
-FAT_RESERVED = 0xFFFFFFFE  # bloco reservado (tipo o superbloco, fat e raiz)
+FAT_RESERVED = 0xFFFFFFFE  # bloco reservado
 
 # tamanho máximo do nome de um arquivo
 MAX_FILENAME_LEN = 100

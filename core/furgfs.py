@@ -20,7 +20,7 @@ class FURGfs:
         self.filepath = filepath
         self.sb = None  # superbloco que será carregado depois
 
-        # se o arquivo já existir a gente já lê o cabeçalho
+        # se o arquivo já existir, lê o cabeçalho
         if os.path.exists(filepath):
             self._load_superblock()
 
@@ -48,7 +48,7 @@ class FURGfs:
 
     def _read_fat(self):
         """
-        Lê a FAT (File Allocation Table) do disco.
+        Lê a FAT do disco.
 
         A FAT é um vetor de inteiros de 4 bytes (uint32), onde cada posição
         corresponde a um bloco e seu valor indica o próximo bloco da cadeia,
@@ -236,7 +236,7 @@ class FURGfs:
 
     def copy_in(self, source, dest):
         """
-        Operação 2: Copia um arquivo do sistema real para dentro do FURGfs4.
+        Operação 3: Copia um arquivo do sistema real para dentro do FURGfs4.
 
         Parâmetros:
             source: caminho do arquivo no SO hospedeiro.
@@ -318,7 +318,7 @@ class FURGfs:
 
     def copy_out(self, source, dest):
         """
-        Operação 3: Copia um arquivo de dentro do FURGfs4 para o sistema real.
+        Operação 4: Copia um arquivo de dentro do FURGfs4 para o sistema real.
 
         Percorre a cadeia de blocos na FAT lendo bloco a bloco e escrevendo
         no arquivo de destino, respeitando o tamanho real do arquivo (sem padding).
@@ -362,7 +362,7 @@ class FURGfs:
 
     def rename(self, old_name, new_name):
         """
-        Operação 4: Renomeia um arquivo armazenado no FURGfs4.
+        Operação 5: Renomeia um arquivo armazenado no FURGfs4.
 
         Apenas altera o campo 'name' na entrada de diretório.
         Respeita a proteção: arquivos protegidos não podem ser renomeados.
@@ -397,7 +397,7 @@ class FURGfs:
 
     def remove(self, filename):
         """
-        Operação 5: Remove um arquivo armazenado no FURGfs4.
+        Operação 6: Remove um arquivo armazenado no FURGfs4.
 
         Libera todos os blocos da cadeia FAT (marcando como FAT_FREE),
         marca a entrada de diretório como não utilizada e atualiza o
@@ -443,7 +443,7 @@ class FURGfs:
 
     def list_dir(self):
         """
-        Operação 6: Lista os arquivos armazenados no FURGfs4.
+        Operação 7: Lista os arquivos armazenados no FURGfs4.
 
         Exibe para cada arquivo:
           - Nome
@@ -470,7 +470,7 @@ class FURGfs:
 
     def df(self):
         """
-        Operação 7: Exibe o espaço livre em relação ao total do FURGfs4.
+        Operação 8: Exibe o espaço livre em relação ao total do FURGfs4.
 
         Mostra tamanho total, espaço livre e espaço usado, tanto em bytes
         quanto em MB, com percentuais.
@@ -490,7 +490,7 @@ class FURGfs:
 
     def protect(self, filename):
         """
-        Operação 8: Alterna a proteção de escrita/remoção de um arquivo.
+        Operação 9: Alterna a proteção de escrita/remoção de um arquivo.
 
         Se o arquivo está desprotegido, protege-o.
         Se já está protegido, desprotege-o (toggle).
@@ -514,7 +514,7 @@ class FURGfs:
 
     def debug(self, filename):
         """
-        Operação 9: Modo debug - lista os índices dos blocos físicos
+        Operação 10: Modo debug - lista os índices dos blocos físicos
         que compõem o arquivo, percorrendo a cadeia FAT.
         """
         fat = self._read_fat()
@@ -544,7 +544,7 @@ class FURGfs:
 
     def sha256sum(self, filename):
         """
-        Operação 10 (Extra): Calcula e exibe o hash SHA-256 de um arquivo
+        Operação 11: Calcula e exibe o hash SHA-256 de um arquivo
         diretamente do sistema de arquivos, sem extrair os dados.
         """
         import hashlib
@@ -578,4 +578,95 @@ class FURGfs:
                 return
 
         print(f"Arquivo '{filename}' não encontrado.")
+
+    def search(self, term):
+        """
+        Operação 12: Busca arquivos em todo o FURGfs4 cujo nome contenha o termo dado.
+
+        Percorre recursivamente a árvore de diretórios a partir da raiz (hoje só
+        existe a raiz, mas a busca já segue entradas do tipo TYPE_DIR caso existam).
+        """
+        fat = self._read_fat()
+        self.read_fat_cached = fat
+        term_lower = term.lower()
+        results = []
+
+        def _search_in(start_block, path_prefix):
+            for e in self._read_dir(start_block):
+                if not e['in_use']:
+                    continue
+                if term_lower in e['name'].lower():
+                    results.append((path_prefix + e['name'], e))
+                if e['type'] == TYPE_DIR:
+                    _search_in(e['first_block'], path_prefix + e['name'] + "/")
+
+        _search_in(self.sb['root_dir_start_block'], "/")
+        del self.read_fat_cached
+
+        if not results:
+            print(f"Nenhum arquivo encontrado contendo '{term}'.")
+            return
+
+        print(f"\nResultados da busca por '{term}':")
+        for path, e in results:
+            blocks = math.ceil(e['size_bytes'] / BLOCK_SIZE) if e['size_bytes'] > 0 else 1
+            occupied = blocks * BLOCK_SIZE
+            print(f"  {path:<40} | {e['size_bytes']} bytes (ocupado: {occupied} bytes)")
+
+    def diff(self, internal_name, external_path):
+        """
+        Operação 13: Compara um arquivo armazenado no FURGfs4 com um arquivo
+        externo, bloco a bloco, e diz se são iguais ou diferentes.
+        """
+        if not os.path.exists(external_path):
+            print(f"Arquivo externo '{external_path}' não existe.")
+            return
+
+        fat = self._read_fat()
+        self.read_fat_cached = fat
+        entries = self._read_dir(self.sb['root_dir_start_block'])
+        del self.read_fat_cached
+
+        for e in entries:
+            if e['in_use'] and e['name'] == internal_name:
+                if e['type'] == TYPE_DIR:
+                    print(f"'{internal_name}' é um diretório.")
+                    return
+
+                external_size = os.path.getsize(external_path)
+                if external_size != e['size_bytes']:
+                    print(f"Arquivos diferentes: tamanhos distintos "
+                          f"({e['size_bytes']} bytes internos vs {external_size} bytes externos).")
+                    return
+
+                bytes_left = e['size_bytes']
+                current_block = e['first_block']
+                offset = 0
+
+                with open(self.filepath, 'rb') as f_int, open(external_path, 'rb') as f_ext:
+                    while bytes_left > 0 and current_block != FAT_FREE:
+                        f_int.seek(current_block * BLOCK_SIZE)
+                        to_read = min(bytes_left, BLOCK_SIZE)
+                        internal_data = f_int.read(to_read)
+
+                        f_ext.seek(offset)
+                        external_data = f_ext.read(to_read)
+
+                        if internal_data != external_data:
+                            for i in range(len(internal_data)):
+                                if internal_data[i] != external_data[i]:
+                                    print(f"Arquivos diferentes: divergência no byte {offset + i}.")
+                                    return
+
+                        offset += to_read
+                        bytes_left -= to_read
+
+                        if fat[current_block] == FAT_EOF:
+                            break
+                        current_block = fat[current_block]
+
+                print(f"Arquivos idênticos: '{internal_name}' e '{external_path}'.")
+                return
+
+        print(f"Arquivo '{internal_name}' não encontrado no FURGfs4.")
 
