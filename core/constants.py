@@ -21,3 +21,4 @@ MAX_FILENAME_LEN = 100
 
 # tipos de arquivo no diretório
 TYPE_FILE = 0  # é um arquivo
+TYPE_DIR = 1   # é um diretório

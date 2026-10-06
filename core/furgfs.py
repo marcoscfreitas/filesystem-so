@@ -233,8 +233,7 @@ class FURGfs:
             f.write(b'\x00')
 
         self._load_superblock()
-        print(f"Sistema de arquivos criado com sucesso: {size_mb} MB "
-              f"({ROOT_DIR_BLOCKS * (BLOCK_SIZE // DIR_ENTRY_SIZE)} entradas de diretório)")
+        print(f"Sistema de arquivos criado com sucesso: {size_mb} MB ")
 
     def copy_in(self, source, dest):
         """
