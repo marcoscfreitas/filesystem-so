@@ -166,26 +166,21 @@ class FURGfs:
 
         # converte o tamanho em mb para bytes
         size_bytes = size_mb * 1024 * 1024
-        
         # calcula a quantidade total de blocos do disco
         total_blocks = size_bytes // BLOCK_SIZE
-
         # calcula quantos bytes a tabela fat vai ocupar
         fat_size_bytes = total_blocks * 4
         # calcula quantos blocos a fat vai precisar ocupar
         fat_blocks = math.ceil(fat_size_bytes / BLOCK_SIZE)
-
         # superbloco sempre fica no bloco 0, fat comeca no bloco 1
         fat_start = 1
-        
         # o diretorio raiz comeca logo apos a fat
         root_start = fat_start + fat_blocks
-        
         # a area de dados comeca logo apos o diretorio raiz
         data_start = root_start + ROOT_DIR_BLOCKS
-        
         # o que sobrar de espaco sao os blocos livres
         free_blocks = total_blocks - data_start
+
 
         if free_blocks <= 0:
             print("Tamanho muito pequeno para criar o FS.")
@@ -203,38 +198,35 @@ class FURGfs:
             # preenche o resto do bloco do superbloco com zeros
             f.write(b'\x00' * (BLOCK_SIZE - SUPERBLOCK_SIZE))  
 
+
             # inicializa a tabela fat inteira como livre
             fat = [FAT_FREE] * total_blocks
-            
             # marca o superbloco como reservado na fat
             fat[0] = FAT_RESERVED  
-            
             # marca os blocos da propria fat como reservados
             for i in range(fat_start, root_start):
                 fat[i] = FAT_RESERVED  
-
             # encadeia os blocos do diretorio raiz na fat
             for i in range(ROOT_DIR_BLOCKS - 1):
                 fat[root_start + i] = root_start + i + 1
             # marca o ultimo bloco do diretorio raiz com fim de arquivo
             fat[root_start + ROOT_DIR_BLOCKS - 1] = FAT_EOF  
-
             # converte a fat para bytes e escreve no disco
             fat_bytes = struct.pack(f"<{total_blocks}I", *fat)
             f.write(fat_bytes)
             # preenche o resto do ultimo bloco da fat com zeros
             f.write(b'\x00' * ((fat_blocks * BLOCK_SIZE) - len(fat_bytes)))
 
+
             # cria uma entrada de diretorio vazia
             empty_entry = pack_dir_entry("", 0, 0, 0, 0, 0, 0, 0)
-            
             # calcula quantas entradas cabem em um bloco
             entries_per_block = BLOCK_SIZE // DIR_ENTRY_SIZE
-            
             # preenche todo o espaco do diretorio raiz com entradas vazias
             for _ in range(ROOT_DIR_BLOCKS):
                 for _ in range(entries_per_block):
                     f.write(empty_entry)
+
 
             # estica o arquivo ate o tamanho final desejado escrevendo um zero no final
             f.seek(size_bytes - 1)
@@ -287,8 +279,8 @@ class FURGfs:
             del self.read_fat_cached
             return
 
+        # copia bloco a bloco na fat
         first_block = blocks[0]
-        # abre os arquivos de origem e destino para copiar os dados
         with open(source, 'rb') as f_src, open(self.filepath, 'rb+') as f_dst:
             for i in range(blocks_needed):
                 b = blocks[i]
